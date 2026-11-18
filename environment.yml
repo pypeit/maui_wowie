@@ -1,0 +1,14 @@
+# Conda environment for the maui_wowie project.
+#
+# PypeIt itself is not listed: the `pypeit14` environment uses an editable
+# (development) install of the PypeIt repository, e.g.
+#     pip install -e /path/to/PypeIt
+name: pypeit14
+channels:
+  - conda-forge
+dependencies:
+  - python=3.14
+  - pip
+  - pip:
+      # Keck Observatory Archive client; used by maui_wowie/io/koa.py
+      - pykoa>=1.7.2
