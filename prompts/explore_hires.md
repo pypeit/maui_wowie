@@ -53,6 +53,32 @@ If you have any questions, put them in the `Q&A/Q1645+5520` section below.
 Log your work in the Logs section below.
 Use Fable if you can.
 
+3. We are going to reduce the May 09 data with PypeIt.  Let us first create
+the PypeIt file with a call to `pypeit_setup`.  Run that from the data directory:
+`Astronomy/data/MauiWowie/HIRES/1997-05-09_Q1645+5520`.  For repetativlity, create
+a Python script to do this and place it in the `maui_wowie/pypeit` folder.
+If you have any questions, put them in the `Q&A/Q1645+5520` section below.
+Log your work in the Logs section below.
+Use Fable if you can.
+
+4. I have answered your questions in the Q&A section below.  
+And I have modified the PypeIt code to recognise `IMAGETYP = 'bias'` as a bias/dark.
+Rerun `pypeit_setup` and report the results.
+Log your work in the Logs section below.
+Use Fable if you can.
+
+5. Ok, now proceed to reduce the data with PypeIt.  Run `run_pypeit` from the 
+data directory:
+`Astronomy/data/MauiWowie/HIRES/1997-05-09_Q1645+5520`.
+Create a Python script to do this and place it in the `maui_wowie/pypeit` folder.
+I have commented out the SAO 31165 frame in the PypeIt file.
+We will want to avoid files like this in the future too.  Ideally via your 
+pypeit scripts.
+If you have any questions, put them in the `Q&A/Q1645+5520` section below.
+Log your work in the Logs section below.
+Use Fable if you can.
+
+
 ## Q&A
 
 ### Q1645+5520
@@ -81,6 +107,22 @@ an echelle setting closest to May 09.
    `1997-05-29_Q1645+5520` under `/Users/xavier/Astronomy/data/MauiWowie/HIRES`.
    OK?
 >A. Yes, that is ok.
+
+Questions from Claude (prompt #3, 2026-11-18):
+
+5. **Bias frames are not recognised by PypeIt.** The four zero-second frames
+   from May 09 have `IMAGETYP = 'bias'`, but for pre-1998 data
+   `keck_hires_orig` only recognises `IMAGETYP = 'dark'` as a bias/dark
+   (the `RED97` branch of `compound_meta` in `keck_hires.py`). They were
+   left untyped and commented out, so Setup A has no bias frames. Options:
+   (a) reduce with overscan subtraction only, (b) I add the four frames to
+   the PypeIt file as `bias` from the script, or (c) add a `"bias"` case to
+   PypeIt itself. Which do you prefer?
+>A. I have modified the PypeIt code to recognise `IMAGETYP = 'bias'` as a bias/dark.
+6. **SAO 31165 is typed `science`.** This 15-s exposure
+   (`HI.19970509.52473.fits`) is not in PypeIt's standard-star archive, so
+   it was typed as science. Should it stay, be dropped, or be retyped?
+>A. We do not need to use a standard star for our analysis.  Ignore it
 
 ## Logs
 
@@ -208,3 +250,86 @@ Things to know before the reduction:
 - These are original-detector frames (Tektronix 2048, single amplifier),
   so the PypeIt spectrograph is `keck_hires_orig`, which exists in the
   installed `develop` branch. I have not run it on these data.
+
+#### 2026-11-18 -- Prompt #3: `pypeit_setup` for May 09
+
+Code: `maui_wowie/pypeit/run_setup.py`. It changes into the data directory
+and calls PypeIt's `Setup` script class with the equivalent of
+
+    cd /Users/xavier/Astronomy/data/MauiWowie/HIRES/1997-05-09_Q1645+5520
+    pypeit_setup -s keck_hires_orig -r lev0 -c all -o
+
+Run with `conda run -n pypeit14 python -m maui_wowie.pypeit.run_setup`
+(options: `--datadir`, `--spectrograph`, `--cfg_split`, `--no_overwrite`).
+PypeIt version 3.0.1.dev2+g42ef90446 (`develop` branch).
+
+Result: `pypeit_setup` ran without error and found two configurations.
+Output in the data directory:
+
+- `keck_hires_orig_A/keck_hires_orig_A.pypeit` (and `.calib`) -- the
+  Q1645+5520 setup: `RED97`, decker C1, kv408, echangle -0.432,
+  xdangle 0.0025, binning 1,2. 14 frames, all in calibration group 0:
+  4 `arc,tilt`, 4 `pixelflat,illumflat,trace`, 4 `science` (Q1645+5520),
+  1 `science` (SAO 31165) and 1 `standard` (BD+28 4211).
+- `keck_hires_orig_B/keck_hires_orig_B.pypeit` (and `.calib`) -- only the
+  four zero-second frames, untyped and commented out. This file is not
+  usable; it exists because those frames were taken in a different setup
+  (C2 / og530) and were not recognised as biases (see Q&A item 5).
+- `pypeit_setup_20261118-1648.log`.
+
+Notes:
+
+- The PypeIt file has no `[rdx]` parameters beyond the spectrograph; I did
+  not edit it by hand.
+- PypeIt labels the cross-disperser `RED97` for all data before 1998,
+  whatever the `XDISPERS` header says.
+- The science frames carry B1950 coordinates in their headers
+  (`EQUINOX = 1950.0`, RA 16:45:52.92, Dec +55:20:04.3), and PypeIt copies
+  them unchanged into the `ra`/`dec` columns (251.4705, 55.3345). The
+  J2000 position from KOA is 251.730, 55.247. This matters for
+  standard-star matching, and slightly for the heliocentric correction.
+- PypeIt warned that some frames qualified as both science and standard;
+  it resolved them by coordinate match to its standard archive, which is
+  why BD+28 4211 is `standard` and SAO 31165 is `science`.
+
+#### 2026-11-18 -- Prompt #4: rerun `pypeit_setup` for May 09 (bias fix)
+
+Reran `conda run -n pypeit14 python -m maui_wowie.pypeit.run_setup`
+(no change to the script). PypeIt is the local `orig-hires-fixes` branch
+with the uncommitted edit to `pypeit/spectrographs/keck_hires.py` that adds
+a `"bias"` case to the `RED97` branch (version string still
+3.0.1.dev2+g42ef90446).
+
+Result: `pypeit_setup` ran without error and now finds **one**
+configuration; all 18 frames are typed. Output in the data directory:
+
+- `keck_hires_orig_A/keck_hires_orig_A.pypeit` (and `.calib`) -- Setup A:
+  `RED97`, decker C1, kv408, echangle -0.432, xdangle 0.0025, binning 1,2.
+  18 frames, all in calibration group 0:
+
+  | Frame type | N | Frames |
+  |---|---|---|
+  | `arc,tilt` | 4 | HI.19970509.43673 / 46467 / 49385 / 52330 (ThAr, 1 s) |
+  | `bias` | 4 | HI.19970509.02050 / 02145 / 02239 / 02332 (0 s) |
+  | `pixelflat,illumflat,trace` | 4 | HI.19970509.00053 / 00184 / 00281 / 00379 (quartz, 3 s) |
+  | `science` | 4 | HI.19970509.40564 / 43849 / 46585 / 49499 (Q1645+5520; 3000, 2500, 2700, 2700 s) |
+  | `science` | 1 | HI.19970509.52473 (SAO 31165, 15 s) |
+  | `standard` | 1 | HI.19970509.52723 (BD+28 4211, 300 s) |
+
+- `pypeit_setup_20261118-1700.log`.
+- There is no `keck_hires_orig_B` any more: the biases are excluded from
+  the configuration matching and are attached to Setup A.
+
+Notes:
+
+- The four biases keep their own header values in the table (decker C2,
+  og530, echangle 0.191, xdangle 1.345). They are in Setup A only because
+  PypeIt ignores bias/dark frames when defining configurations.
+- SAO 31165 is still typed `science` and BD+28 4211 `standard`. Per Q&A
+  item 6 they are to be ignored, but I did not edit the PypeIt file; both
+  rows need to be commented out (or removed) before `run_pypeit`,
+  otherwise PypeIt will reduce them.
+- Same warning as before about frames qualifying as both science and
+  standard; nothing else of note in the log.
+- The `ra`/`dec` columns are still the B1950 header values (see the
+  prompt #3 log).
