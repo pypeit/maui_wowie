@@ -1,0 +1,9 @@
+# Parameters added to the PypeIt files of the original (pre August 2004)
+# HIRES detector by maui_wowie.pypeit.run_setup (pypeit_setup -p).
+#
+# The quartz flats exceed the PypeIt non-linearity limit (0.7 x 65535 ADU)
+# over most of the red orders, including order 53.  Do not flat-field
+# those orders, but do extract them.
+[calibrations]
+    [[flatfield]]
+        saturated_slits = continue

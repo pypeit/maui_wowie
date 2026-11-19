@@ -124,6 +124,28 @@ Questions from Claude (prompt #3, 2026-11-18):
    it was typed as science. Should it stay, be dropped, or be retyped?
 >A. We do not need to use a standard star for our analysis.  Ignore it
 
+Questions from Claude (prompt #5, 2026-11-18):
+
+7. **The flats are too bright in the red orders.** The 3-s quartz flats
+   peak at ~61,500 ADU in order 53 (median 49,200). They never reach the
+   ADC limit of 65,535, but they are above PypeIt's non-linearity limit for
+   this detector (0.7 x 65,535 = 45,874 ADU), and `run_pypeit` crashes on
+   order 53 by default. To get a reduction I set
+   `[calibrations][[flatfield]] saturated_slits = continue`, which means
+   orders 53 and 52 are **not flat-fielded** (and much of orders 54-57 has
+   the pixel flat set to 1). Is that acceptable for the Maui Wowie search,
+   or do you want to raise the `nonlinear` fraction for `keck_hires_orig`
+   in PypeIt (it is hard-coded in the detector definition, so it cannot be
+   set from the PypeIt file)? I do not know how linear this CCD is above
+   46,000 ADU.
+8. **BD+28 4211.** It is still in the PypeIt file as `standard` and was
+   reduced (about 30 s of the run). `run_setup.py` has a `--drop_standards`
+   option that comments it out; should that be the default?
+9. **Output location.** As requested `run_pypeit` runs from the data
+   directory, so `Calibrations/`, `Science/` and `QA/` are in
+   `1997-05-09_Q1645+5520/` and not in `keck_hires_orig_A/`. OK to keep
+   this convention for other nights?
+
 ## Logs
 
 ### Q1645+5520
@@ -333,3 +355,70 @@ Notes:
   standard; nothing else of note in the log.
 - The `ra`/`dec` columns are still the B1950 header values (see the
   prompt #3 log).
+
+#### 2026-11-18 -- Prompt #5: `run_pypeit` for May 09
+
+Code (in `maui_wowie/pypeit`):
+
+- `run_reduce.py` (new) -- changes into the data directory and calls
+  PypeIt's `RunPypeIt` script class with the equivalent of
+  `run_pypeit keck_hires_orig_A/keck_hires_orig_A.pypeit -o`. Run with
+  `conda run -n pypeit14 python -m maui_wowie.pypeit.run_reduce`
+  (options: `--datadir`, `--spectrograph`, `--setup`, `--calib_only`,
+  `--redo_calibs`, `--no_overwrite`).
+- `run_setup.py` (changed) -- after `pypeit_setup` it now comments out, in
+  the PypeIt file, every `science` frame whose target is not `--target`
+  (default `Q1645+5520`; `all` keeps everything). This reproduces your
+  hand edit: only `HI.19970509.52473.fits` (SAO 31165) is commented out.
+  `--drop_standards` also comments out `standard` frames (off by default).
+  It also passes a parameter block to `pypeit_setup -p` (`--param_file`).
+- `keck_hires_orig.par` (new) -- that parameter block; currently only
+  `[calibrations][[flatfield]] saturated_slits = continue`.
+
+I reran `run_setup` twice (regenerating the PypeIt file, same content as
+your edited version plus the parameter block) and `run_reduce` twice.
+
+First run: **crashed** in the flat-field step after ~2 min --
+"Only 44.66% of the pixels on slit 911 are not saturated". Slit 911 is
+echelle order 53. Median / peak counts of the quartz flat along the order
+centres (ADU, one flat): order 78: 5,400 / 8,600; order 60: 31,800 /
+39,300; order 57: 40,800 / 49,800; order 54: 47,300 / 58,500; order 53:
+49,200 / 61,500; order 52: 49,800 / 61,400. Nothing is at 65,535 apart
+from 1-2 pixels per frame; the limit being hit is PypeIt's non-linearity
+threshold (45,874 ADU). See Q&A item 7.
+
+Second run, with `saturated_slits = continue`: **completed** in 4 min 54 s
+without error. Products in the data directory:
+
+- `Calibrations/` -- Bias, Arc, Tiltimg, Edges, Slits, WaveCalib, Tilts,
+  Flat (all `_A_0_DET01`).
+- `Science/` -- `spec2d` and `spec1d` (+ `.txt`) for the four Q1645+5520
+  exposures and for BD+28 4211.
+- `QA/` -- `MF_A.html` and one HTML page per exposure.
+- `keck_hires_orig_A/keck_hires_orig_A.log` -- the PypeIt log.
+
+Results:
+
+- 28 orders traced: 78 (blue, ~4559 A centre) to 51 (red). m x lambda =
+  3.556e5 A, so the estimate in Q&A item 1 holds.
+- **Order 53 covers 6658.7-6756.0 A** and was extracted (optimal) in all
+  four science exposures, median S/N per pixel 5.7-6.3. Its arc solution
+  is the best of all orders (RMS 0.058 pix).
+- Wavelength calibration: RMS 0.06-0.19 pix for orders 78-52; 2D fit RMS
+  0.11 A x order. Order 51 (at the detector edge) failed the
+  cross-correlation and was refit with RMS 0.48 pix -- not to be trusted.
+- Quasar S/N per pixel per exposure: ~0 at order 78, 1-3 for orders 76-60,
+  6-8 for orders 57-52. Object FWHM 2.4-2.9 binned spatial pixels,
+  i.e. 1.05-1.2 arcsec (`opt_fwhm`).
+- Orders with no extraction because the global sky fit was rejected (just
+  over 80% of pixels masked): order 51 in exposures 40564, 43849 and
+  46585; orders 68 and 57 in exposure 43849.
+- Flat field: orders 53 and 52 were skipped (not flat-fielded). PypeIt
+  also warned of "unrealistically high or low values" in the flat model
+  for orders 54 (18,069 pix), 55 (13,828), 56 (8,701), 51 (8,903), and a
+  few hundred pixels in orders 57 and 64.
+
+Not done: I have not looked at the QA plots or the 2D images, so I have
+not checked the sky subtraction in order 53 or looked for the Maui Wowie
+signal. Note that PypeIt's sky model will subtract any emission that
+fills the slit; the sky model is kept in the `spec2d` files.
