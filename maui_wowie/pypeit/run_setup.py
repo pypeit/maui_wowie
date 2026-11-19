@@ -10,7 +10,8 @@ UT 1997-05-09 observations of Q1645+5520.
 After ``pypeit_setup`` has run, the PypeIt file(s) are edited to comment out
 the ``science`` frames that are not of the requested target (e.g. bright
 stars that PypeIt does not recognise as standards), so that ``run_pypeit``
-does not reduce them.
+does not reduce them.  The standard-star frames are commented out too,
+unless ``--keep_standards`` is given.
 
 Usage::
 
@@ -62,8 +63,10 @@ def get_parser():
                         help='Name of the science target.  Science frames of '
                              'any other target are commented out of the '
                              'PypeIt file.  Use "all" to keep every frame.')
-    parser.add_argument('--drop_standards', default=False, action='store_true',
-                        help='Also comment out the standard-star frames.')
+    parser.add_argument('--keep_standards', dest='drop_standards',
+                        default=True, action='store_false',
+                        help='Keep the standard-star frames.  By default '
+                             'they are commented out of the PypeIt file.')
     parser.add_argument('--no_overwrite', default=False, action='store_true',
                         help='Do not overwrite existing pypeit_setup output.')
     return parser
